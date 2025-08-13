@@ -1,4 +1,3 @@
-# فایل: DBConnr.py
 import sqlite3
 from datetime import datetime
 import jdatetime
@@ -69,7 +68,7 @@ def init_db():
             allow_unsubscribe INTEGER CHECK(allow_unsubscribe IN (0,1)) DEFAULT 1
         )
         ''')
-        # اگر تنظیمات وجود نداشت، مقدار اولیه بگذار
+        
         cursor.execute('SELECT COUNT(*) FROM settings')
         if cursor.fetchone()[0] == 0:
             cursor.execute('INSERT INTO settings (delete_time, welcome_message, allow_user_filters, allow_newsletter_unsubscribe) VALUES (?, ?, ?, ?)', 
@@ -90,7 +89,7 @@ def update_settings(**kwargs):
         cursor = conn.cursor()
         for key, value in kwargs.items():
             cursor.execute(f'UPDATE settings SET {key} = ?', (value,))
-        # اگر جدول تنظیمات خالی بود مقدار اولیه بزن
+        
         cursor.execute('SELECT COUNT(*) FROM settings')
         if cursor.fetchone()[0] == 0:
             cursor.execute('INSERT INTO settings (delete_time, welcome_message, allow_user_filters, allow_newsletter_unsubscribe) VALUES (?, ?, ?, ?)', 
@@ -282,5 +281,4 @@ def delete_file_with_fileid(file_id: str) -> bool:
         conn.commit()
         return cursor.rowcount > 0
 
-# مقداردهی اولیه هنگام ایمپورت
 init_db()

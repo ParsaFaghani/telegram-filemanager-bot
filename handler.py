@@ -27,17 +27,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if args:
       try:
         param = int(args[0])
+        file_info = get_file(param)
+        if not file_info:
+          await query.edit_message_text("⚠️ فایل پیدا نشد!")
+          return
+        
         channels = get_channels()
         join_channel = await check_channel_membership(context, user_id, channels)
         if not join_channel:
-          await send_file_to_user(context, chat_id, user_id, param)
+          if file_info[5] and not get_user_data(context, f"unlocked_{param}"):
+            await update.message.reply_text("🔒 لطفاً رمز فایل را وارد کنید:", reply_markup=ForceReply(selective=True))
+            set_user_data(context, "awaiting_password", param)
+            return
+          else:
+            await send_file_to_user(context, chat_id, user_id, param)
         else:
           join_channel.append([InlineKeyboardButton("✅ عضو شدم", callback_data=f"send_file={param}")])
           reply_markup = InlineKeyboardMarkup(join_channel)
           await update.message.reply_text(
             "📢 برای استفاده از ربات، لطفاً در کانال‌های زیر عضو شوید:",reply_markup=reply_markup,)
-      except ValueError:
-        await update.message.reply_text("پارامتر نا معتبر، فایل وجود ندارد.")
+      except Exception as e:
+        logger.error(f"Error start def error : {e}")
+        await update.message.reply_text("خطا در ارسال.")
     else:
       settings = get_settings()
       welcome_msg = settings[1]
@@ -195,7 +206,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         logger.info(f"Text received from user {user_id}: {received_text}")
         save_user(user_id)
 
-        # بررسی رمز برای کاربران عادی
         if get_user_data(context, "awaiting_password") and not get_user_data(context, "file_data_added") and not get_user_data(context, "media_group"):
             file_id = get_user_data(context, "awaiting_password")
             if check_password(int(file_id), received_text):
@@ -243,7 +253,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 password = None if received_text == "بدون رمز" else received_text
                 info = add_file_info(file_id, caption, file_type, password=password)
                 bot_id = str(context.bot.username).replace('@', '')
-                # پاک کردن همه حالت‌ها برای جلوگیری از تداخل
+ 
                 context.user_data.clear()
                 await update.message.reply_text(
                     f"✅ فایل با موفقیت آپلود شد!\n"
@@ -267,7 +277,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     ids.append(info[0])
                 group_info = add_file_info(str(ids), caption, "group", media_group_id, password)
                 bot_id = str(context.bot.username).replace('@', '')
-                # پاک کردن همه حالت‌ها برای جلوگیری از تداخل
+                
                 context.user_data.clear()
                 await update.message.reply_text(
                     f"✅ مدیا گروپ با موفقیت آپلود شد!\n"
@@ -395,7 +405,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     subscribe_newsletter(user_id)
                     await update.message.reply_text("🎉 به خبرنامه ما خوش اومدی! 🔔", reply_markup=ReplyKeyboardMarkup(main_menu, resize_keyboard=True))
             elif received_text == "آپلود فایل 📤":
-                context.user_data.clear()  # پاک کردن حالت‌های قبلی برای شروع فرآیند جدید
+                context.user_data.clear()
                 set_user_data(context, "awaiting_file", True)
                 await update.message.reply_text("📄 فایل را ارسال کنید:", reply_markup=ReplyKeyboardRemove())
             elif received_text == "حذف فایل 🗑️":

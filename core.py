@@ -17,7 +17,6 @@ def main():
         print("BOT_TOKEN not found in .env file")
         return
 
-    # تنظیم لاگینگ امن
     setup_logging(token)
     logger = logging.getLogger(__name__)
     logger.info("Bot started")

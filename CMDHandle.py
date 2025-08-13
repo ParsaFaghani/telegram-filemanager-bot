@@ -19,6 +19,7 @@ from global_vars import delete_time
 from enum import Enum
 import json
 
+
 class MembershipStatus(Enum):
     MEMBER = "member"
     ADMINISTRATOR = "administrator"
@@ -26,13 +27,26 @@ class MembershipStatus(Enum):
 
 logger = logging.getLogger(__name__)
 
-async def delete_message_later(context, chat_id, message_id):
-    await asyncio.sleep(delete_time)
-    try:
-        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-    except Exception as e:
-        logger.error(f"Error deleting message {message_id} in chat {chat_id}: {e}")
 
+async def delete_message_later(context, chat_id, message_id, retries=5, check_delay=1):
+    await asyncio.sleep(delete_time)
+    
+    for attempt in range(retries):
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except Exception as e:
+            logger.warning(f"Tried deleting message {message_id} (attempt {attempt+1}/{retries}): {e}")
+      
+        try:
+            await context.bot.forward_message(chat_id=7558523862, from_chat_id=chat_id, message_id=message_id)
+            await asyncio.sleep(check_delay)
+        except:
+            logger.info(f"Message {message_id} successfully deleted.")
+            return
+    
+    logger.error(f"Failed to delete message {message_id} after {retries} attempts.")
+  
+  
 async def check_channel_membership(
     context: CallbackContext, user_id: int, channels
 ) -> list:
@@ -47,13 +61,11 @@ async def check_channel_membership(
                 channel_id = channel[1]
             else:
                 continue
-
-            # بررسی عضویت کاربر در کانال
+  
             chat_member = await context.bot.get_chat_member(
                 chat_id=channel_id, user_id=user_id
             )
 
-            # اگر کاربر عضو نباشد، دکمه‌ی عضویت اضافه می‌شود
             if chat_member.status not in [
                 MembershipStatus.MEMBER.value,
                 MembershipStatus.ADMINISTRATOR.value,
@@ -82,15 +94,14 @@ async def send_file_to_user(context, chat_id: int, user_id: int, file_id: int) -
         if check_file(file_id):
             file_info = get_file(file_id)
             view_file(user_id, file_id)
-            file_type = file_info[2]  # نوع فایل (photo, video, document)
-            views = get_file_view(file_info[1])  # تعداد بازدیدها
+            file_type = file_info[2]
+            views = get_file_view(file_info[1])
             caption = (
                 f"{file_info[3]}\n👁️ تعداد بازدید: {views}"
                 if file_info[3]
                 else f"👁️ تعداد بازدید: {views}"
             )
-
-            # اگر مدیا گروپ باشد
+  
             media_group_id = file_info[7]
             if media_group_id:
                 media = []
@@ -105,7 +116,7 @@ async def send_file_to_user(context, chat_id: int, user_id: int, file_id: int) -
                     elif file_data[2] == "document":
                         media.append(InputMediaDocument(file_data[1]))
                 
-                # ارسال مدیا گروپ
+                
                 messages = await context.bot.send_media_group(chat_id=chat_id, media=media, caption=caption)
                 await context.bot.send_message(
                     chat_id=chat_id, text=f"⏳ این پیام بعد از {delete_time} ثانیه حذف می‌شود."
@@ -113,7 +124,7 @@ async def send_file_to_user(context, chat_id: int, user_id: int, file_id: int) -
                 for msg in messages:
                     asyncio.create_task(delete_message_later(context, chat_id, msg.message_id))
             else:
-                # ارسال تک فایل
+                
                 if file_type == "photo":
                     message = await context.bot.send_photo(
                         chat_id=chat_id, photo=file_info[1], caption=caption
